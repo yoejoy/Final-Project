@@ -1,6 +1,7 @@
 list.of.packages <- c("devtools","twitteR","dplyr","purrr","ROAuth","RCurl","stringr","tm","ggmap",
-                      "plyr","wordcloud","tidytext","maps","googleVis","leaflet","shiny","ggplot2",
-                      "MASS","lubridate","scales","wesanderson","tidyr","broom","reshape2")
+                      "plyr","wordcloud","MASS","tidytext","maps","googleVis","leaflet","shiny",
+                      "ggplot2","MASS","lubridate","scales","wesanderson","tidyr","broom",
+                      "reshape2","memoise")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
@@ -390,6 +391,47 @@ MI
 
 
 # shiny
+
+# retweetCount
+s5 <- read.csv("total.csv", row.names = 1)
+s5 <- mutate(s5, popup_info=paste(sep = "<br/>", paste0("<b>", s5$screenName, "</b>"), paste0 ("retweet count: ", s5$retweetCount), paste0 ("sentiment score: ",s5$score)))
+
+factorpal<- colorFactor(
+  palette = "RdPu",
+  domain = c(s5$retweetCount),
+  level = NULL,
+  ordered= FALSE, 
+  na.color = "#808080"
+)
+
+r_colors <- rgb(t(col2rgb(colors()) / 255))
+names(r_colors) <- colors()
+
+ui <- fluidPage(
+  leafletOutput("PopularityMap"),
+  p()
+)
+
+server <- function(input, output, session) {
+ 
+  output$PopularityMap <- renderLeaflet({
+    leaflet(s5) %>%
+      addTiles(
+      ) %>%  # Add default OpenStreetMap map tiles
+      addCircleMarkers(lng=~lon,
+                       lat = ~lat, 
+                       popup= ~popup_info,
+                       radius = 3,
+                       color = ~factorpal(s5$retweetCount),
+                       fillOpacity = 1) %>%
+      addProviderTiles("Stamen.Watercolor") %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      setView(lng = -93.85, lat = 37.45, zoom = 4)
+  })
+}
+
+shinyApp(ui, server)
+
 # wordcloud
 maga <- read.csv("MAGA.csv", row.names = 1)
 never <- read.csv("NEVER.csv", row.names = 1)
@@ -429,10 +471,8 @@ getTermMatrix <- memoise(function(book) {
   names(myCorpus) = NULL
   return(myCorpus)
   
-  
   myDTM = TermDocumentMatrix(myCorpus,
                              control = list(minWordLength = 1))
-  
   m = as.matrix(myDTM)
   word_freqs = sort(rowSums(m), decreasing = TRUE)
   dm = data.frame(word=names(word_freqs), freq=word_freqs)
@@ -455,7 +495,6 @@ server<- function(input, output, session) {
   
   # Make the wordcloud drawing predictable during a session
   wordcloud_rep <- repeatable(wordcloud)
-  
   output$plot <- renderPlot({
     wordcloud_rep(dm$word,dm$freq, scale=c(5,1),
                   min.freq = input$freq, max.words=input$max,
@@ -467,7 +506,6 @@ server<- function(input, output, session) {
 ui<-fluidPage(
   # Application title
   titlePanel("Word Cloud"),
-  
   sidebarLayout(
     # Sidebar with a slider and selection inputs
     sidebarPanel(
@@ -482,54 +520,10 @@ ui<-fluidPage(
                   "Maximum Number of Words:",
                   min = 1,  max = 300,  value = 100)
     ),
-    
     # Show Word Cloud
     mainPanel(
       plotOutput("plot")
     )
   )
 )
-shinyApp(ui, server)
-
-
-# retweetCount
-s5 <- read.csv("total.csv", row.names = 1)
-s5 <- mutate(s5, popup_info=paste(sep = "<br/>", paste0("<b>", s5$screenName, "</b>"), paste0 ("retweet count: ", s5$retweetCount), paste0 ("sentiment score: ",s5$score)))
-
-factorpal<- colorFactor(
-  palette = "RdPu",
-  domain = c(s5$retweetCount),
-  level = NULL,
-  ordered= FALSE, 
-  na.color = "#808080"
-)
-
-r_colors <- rgb(t(col2rgb(colors()) / 255))
-names(r_colors) <- colors()
-
-ui <- fluidPage(
-  leafletOutput("PopularityMap"),
-  p()
-)
-
-server <- function(input, output, session) {
- 
-  output$PopularityMap <- renderLeaflet({
-    leaflet(s5) %>%
-      addTiles(
-      ) %>%  # Add default OpenStreetMap map tiles
-      addCircleMarkers(lng=~lon,
-                       lat = ~lat, 
-                       popup= ~popup_info,
-                       radius = 3,
-                       color = ~factorpal(s5$retweetCount),
-                       fillOpacity = 1) %>%
-      addProviderTiles("Stamen.Watercolor") %>%
-      addProviderTiles("CartoDB.Positron") %>%
-      setView(lng = -93.85, lat = 37.45, zoom = 4)
-    
-  })
-  
-}
-
 shinyApp(ui, server)

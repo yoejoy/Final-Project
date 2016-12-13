@@ -1,6 +1,6 @@
 ---
 title: "Final Project Presentation"
-author: "Mengze Yin, Yilin Li, Yijie Yu, Tianxuan Zhang"
+author: "Mengze Yin, Yilin Li, Yijie Yu, Tianchi Zhang"
 date: "December 12, 2016"
 output: html_document
 ---
@@ -14,7 +14,13 @@ Even after the controversy presidential results came out, the debate on social m
 
 In order to figure out what Internet users are talking about and how they feel during and post the election, we planned to collect historical data during the intervals of three presidential debates. If we could acquire the historical data during those different periods of time, we would be able to compare the information and people's attitude towards the presidency as time went on. However, the major issue we encountered is that Twitter API only allows us to access user data from very recent seven days for confidential reasons. As a result, we changed our focus to recent data to find out what users are talking about in a recent timeframe and analyzed the sentiments and popularity of tweets. 
 
+In this project, we will mainly focus on three parts:
 
+ 1) The statistical relations within retweet data and sentiment score generated from tweet contents using Shapiro.test, Hypothesis Test and Anova Table. We look forward to find out the relationship between sentiment and retweet number, and further compare how different hashtags will influence the user sentiments. 
+ 
+2) The frequency of words mentioned by trump supporters and protestants using Word Cloud.
+
+3) Visualization of sentiments towards Trump among different hashtags (#DonaldTrump, #MAGA, #NeverTrump) and different locations (California, Florida, Great Lakes Area) integrated with shiny application to create an interactive map on tweet popularity.
 
 ## II. Dataset Summary
 
@@ -132,7 +138,7 @@ wordclound3 <- tweetwordcloud(tweets3) # word cloud under topic "Never Trump"
 wordclound4 <- tweetwordcloud(tweets4) # word cloud under the total dataset
 ```
 
-We also run a plot to see the top 20 words more clearly.
+#####We also run a plot to see the top 20 words more clearly.
 ```{r}
 library(dplyr)
 library(tidyr)
@@ -305,8 +311,9 @@ A: Because p < 2e-16 <0.05, there are significant differences between #NeverTrum
 ####Purpose
 The main purpose of mapping is to compare and analyze the distribution of twitter users who posted tweets on our selected topics. We plan to assign different point size to different level of sentiment with a range from 0 to 7, so that both strong negative and positive opinions would be relatively more noticeable on the maps. A sentiment score of -5 shows a strong negative emotion; while a score of 7 shows an extreme positive emotion. To distinguish negative sentiments from positive ones, we plan to apply two different colors, red and blue, based on its sentiment scores.
 
-####Process
+####Practice
 Firstly, we create a world map using ggmap. The tweet points on the map are clustered on the areas of North America and Europe, suggesting that most twitters who posted tweets about Donald Trump are located in these regions.
+
 Then, to view the distribution of these tweets in United States only, we create a country-wide map. From the map it clearly shows that there are more users located on the east coast and the Great Lakes. 
 ```{r}
 library(ggmap)
@@ -375,6 +382,12 @@ MI <- ggmap(MIMap) +
 MI
 ```
 
+Florida, a deep-red state, shows a map of nearly all positive opinions toward Donald Trump. We can see that the size of red points on this map are fairly large, meaning that these positive opinions are relatively strong and solid.
+
+The map for California contains most negative opinions (blue points) among three states. This makes sense since California voted for Hillary Clinton during the president election period. We can see from the map that there are three main clusters of points, which shows that the twitter users who posted opinions about Donald Trump are mainly in big cities, such as San Francisco, Los Angeles, Fresno and San Diego.
+
+For Michigan, the map shows a lot of positive opinions as well as some negative ones, though the sentiment levels of positive opinions are overall much stronger than the ones of negative opinions.
+
 ## V. Interactive Shiny Map
 
 As for the Shiny application, we created an interactive map that easier to use compared to static map in ggplot. For this shiny app, we found it would be more inspiring to focus on the popularity of the content. As a result, we used the raw data from number of retweets counts of each tweets we generated that with greater number of retweets, we considered that individual tweet more popular. In the map, the deeper the color of the popup points, the more popular the tweet content is.
@@ -386,7 +399,14 @@ Moreover, we created the shiny app to create a interactive word cloud app. In th
 
 During the creative process, we confronted problems with error in reactive functions and as publishing the app to share. Even though our code are still immature in some of the part concerning this shiny app especially with the word cloud, we hope that we could solve most of our problems in the future exploration with Shiny. 
 
-https://yoejoy.shinyapps.io/shinyshiny/
+###https://yoejoy.shinyapps.io/shinyshiny/
 
 ## VI. Future Improvements and Questions
 
+As we are going forward in the future, we are looking forward to improve and expand our project in following several aspects.
+
+To find the optimal ways to collect data from real-time service data website. Because of the API limit of twitter and google, we got limited access to a larger data set. As we noticed during the process, a larger dataset will not only saturate our project with more factual evidences, but also will offer a wider range of choices in our analysis as a whole.
+To explore and figure out a better way to present the popularity of tweets based on various geographic areas in the States. We think it would be beneficial to plot a heatmap based on different states if we can extract the specific states location from our data.
+To compare current result in a larger scope of context. We look forward to analyze more on the similarity between social media reaction and actual election results if we will have access to historical data. 
+
+###Please feel free to contact any of us if you have further questions and concerns. Thank you for reading the project :)
