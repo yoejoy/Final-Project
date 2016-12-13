@@ -1,6 +1,7 @@
 list.of.packages <- c("devtools","twitteR","dplyr","purrr","ROAuth","RCurl","stringr","tm","ggmap",
-                      "plyr","wordcloud","tidytext","maps","googleVis","leaflet","shiny","ggplot2",
-                      "MASS","lubridate","scales","wesanderson","tidyr","broom","reshape2")
+                      "plyr","wordcloud","MASS","tidytext","maps","googleVis","leaflet","shiny",
+                      "ggplot2","MASS","lubridate","scales","wesanderson","tidyr","broom",
+                      "reshape2","memoise")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
@@ -169,7 +170,7 @@ s41 <- rbind(s4,s43)
 write.csv(s41,"TRUMP.csv")
 data1 <- read.csv("TRUMP.csv", row.names = 1)
 
-# Dataset Summary
+# Dataset Collection Summary
 data3 <- read.csv("never.csv",row.names = 1)
 data2 <- read.csv("maga.csv", row.names = 1)
 data1 <- read.csv("trump.csv",row.names = 1)
@@ -244,9 +245,9 @@ d5 <- rbind(d3, d2)
 
 score.response = na.omit(d4$score)
 
-xbar = mean(score.response)            # sample mean 
-s = sd(score.response)                 # sample standard deviation 
-n = length(score.response)    # sample size 
+summary(score.response)
+retweet <- total$retweetCount                # sample standard deviation 
+summary(retweet)
 ## Shapiro.test, confidence level= 95%. If p < 0.05, our data deviates from deviation.
 
 data_score= d4$score
@@ -259,7 +260,7 @@ qqnorm(data_score);qqline(data_score, col = 2)
 
 alpha=0.05
 mu0 = -1                        # hypothesized value 
-t = (xbar - mu0)/(s/sqrt(n)) 
+t = (mean(score.response) - mu0)/(s/sqrt(n)) 
 t                      # test statistic 
 #compute the critical values at .05 significance leveL                      
 t.half.alpha = qt(1 - alpha/2, df= n - 1) 
@@ -279,14 +280,6 @@ ggplot(data = total, aes(x = score, y = retweetCount)) +
 theme_bw()
 
 # Anova Table -- check if there is any difference in the retweet number between #NeverTrump and #MAGA groups
-#https://www.r-bloggers.com/analysis-of-variance-anova-for-multiple-comparisons/
-# test for variance, if variances are the same, we can then use anova to compare the means
-# score - factor(hashtag)
-nevertrump = d3$score
-maga = d2$score
-dati = c(nevertrump,maga)
-var.test(nevertrump,maga)  
-
 # compare the retweet mean difference across the 10 score groups from -5 to 5
 results <- aov(retweetCount ~ factor(score), data=d5) 
 summary(results)
@@ -371,7 +364,7 @@ MAP3
 MAP4 <- USAMap +
   geom_point(aes(x=lon, y=lat), col=ifelse(((total$score>=0)),"brown1", "blue"), data=total, alpha=0.4, size=total$absolute_score) +
   scale_size_continuous(range=total$score)+
-  ggtitle("U.S Mapping under #MakeAmericaGreatAgain")
+  ggtitle("U.S Mapping under the Total Dataset")
 MAP4
 
 # sentiment across different states
@@ -398,111 +391,6 @@ MI
 
 
 # shiny
-# wordcloud
-maga <- read.csv("MAGA.csv", row.names = 1)
-never <- read.csv("NEVER.csv", row.names = 1)
-trump <- read.csv("TRUMP.csv", row.names = 1)
-# The list of valid books
-write.table(maga$text, "maga.txt", fileEncoding='utf8')
-write.table(never$text, "never.txt",fileEncoding='utf8' )
-write.table(trump$text, "trump.txt",fileEncoding='utf8' )
-
-
-
-books <- list("#MakeAmericanGreatAgain" = "maga" ,
-              "#NeverTrump" =  "never",
-              "#DonaldTrump" = "trump")
-
-
-# Using "memoise" to automatically cache the results
-
-getTermMatrix <- memoise(function(book) {
-  
-  text <- readLines(sprintf("./%s.txt", book),encoding="UTF-8")
-  
-  myCorpus = Corpus(VectorSource(text))
-  myCorpus = tm_map(myCorpus, PlainTextDocument)
-  myCorpus = tm_map(myCorpus, removePunctuation)
-  myCorpus = tm_map(myCorpus, removeNumbers)
-  myCorpus = tm_map(myCorpus, content_transformer(function(x) iconv(enc2utf8(x), sub = "byte")))
-  myCorpus = tm_map(myCorpus, removeWords,
-                    c(stopwords("SMART"), "donald", "trump","real"))
-  
-  try.tolower = function(x){
-    y = NA
-    try_error = tryCatch(tolower(x), error=function(e) e)
-    if (!inherits(try_error, "error"))
-      y = tolower(x)
-    return(y)
-  }
-  myCorpus = sapply(myCorpus, try.tolower)
-  myCorpus = myCorpus[myCorpus != ""]
-  names(myCorpus) = NULL
-  return(myCorpus)
-  
-  
-  myDTM = TermDocumentMatrix(myCorpus,
-                             control = list(minWordLength = 1))
-  
-  m = as.matrix(myDTM)
-  word_freqs = sort(rowSums(m), decreasing = TRUE)
-  dm = data.frame(word=names(word_freqs), freq=word_freqs)
-})
-
-###server
-server<- function(input, output, session) {
-  # Define a reactive expression for the document term matrix
-  terms <- reactive({
-    # Change when the "update" button is pressed...
-    input$update
-    # ...but not for anything else
-    isolate({
-      withProgress({
-        setProgress(message = "Processing corpus...")
-        getTermMatrix(input$selection)
-      })
-    })
-  })
-  
-  # Make the wordcloud drawing predictable during a session
-  wordcloud_rep <- repeatable(wordcloud)
-  
-  output$plot <- renderPlot({
-    wordcloud_rep(dm$word,dm$freq, scale=c(5,1),
-                  min.freq = input$freq, max.words=input$max,
-                  colors=brewer.pal(8, "Dark2"))
-  })
-}
-
-###ui
-ui<-fluidPage(
-  # Application title
-  titlePanel("Word Cloud"),
-  
-  sidebarLayout(
-    # Sidebar with a slider and selection inputs
-    sidebarPanel(
-      selectInput("selection", "Choose a hashtag:",
-                  choices = books),
-      actionButton("update", "Change"),
-      hr(),
-      sliderInput("freq",
-                  "Minimum Frequency:",
-                  min = 1,  max = 100, value = 15),
-      sliderInput("max",
-                  "Maximum Number of Words:",
-                  min = 1,  max = 300,  value = 100)
-    ),
-    
-    # Show Word Cloud
-    mainPanel(
-      plotOutput("plot")
-    )
-  )
-)
-shinyApp(ui, server)
-
-
 
 # retweetCount
 s5 <- read.csv("total.csv", row.names = 1)
@@ -539,9 +427,103 @@ server <- function(input, output, session) {
       addProviderTiles("Stamen.Watercolor") %>%
       addProviderTiles("CartoDB.Positron") %>%
       setView(lng = -93.85, lat = 37.45, zoom = 4)
-    
   })
-  
 }
 
+shinyApp(ui, server)
+
+# wordcloud
+maga <- read.csv("MAGA.csv", row.names = 1)
+never <- read.csv("NEVER.csv", row.names = 1)
+trump <- read.csv("TRUMP.csv", row.names = 1)
+# The list of valid books
+write.table(maga$text, "maga.txt", fileEncoding='utf8')
+write.table(never$text, "never.txt",fileEncoding='utf8' )
+write.table(trump$text, "trump.txt",fileEncoding='utf8' )
+
+books <- list("#MakeAmericanGreatAgain" = "maga" ,
+              "#NeverTrump" =  "never",
+              "#DonaldTrump" = "trump")
+
+# Using "memoise" to automatically cache the results
+
+getTermMatrix <- memoise(function(book) {
+  
+  text <- readLines(sprintf("./%s.txt", book),encoding="UTF-8")
+  
+  myCorpus = Corpus(VectorSource(text))
+  myCorpus = tm_map(myCorpus, PlainTextDocument)
+  myCorpus = tm_map(myCorpus, removePunctuation)
+  myCorpus = tm_map(myCorpus, removeNumbers)
+  myCorpus = tm_map(myCorpus, content_transformer(function(x) iconv(enc2utf8(x), sub = "byte")))
+  myCorpus = tm_map(myCorpus, removeWords,
+                    c(stopwords("SMART"), "donald", "trump","real"))
+  
+  try.tolower = function(x){
+    y = NA
+    try_error = tryCatch(tolower(x), error=function(e) e)
+    if (!inherits(try_error, "error"))
+      y = tolower(x)
+    return(y)
+  }
+  myCorpus = sapply(myCorpus, try.tolower)
+  myCorpus = myCorpus[myCorpus != ""]
+  names(myCorpus) = NULL
+  return(myCorpus)
+  
+  myDTM = TermDocumentMatrix(myCorpus,
+                             control = list(minWordLength = 1))
+  m = as.matrix(myDTM)
+  word_freqs = sort(rowSums(m), decreasing = TRUE)
+  dm = data.frame(word=names(word_freqs), freq=word_freqs)
+})
+
+###server
+server<- function(input, output, session) {
+  # Define a reactive expression for the document term matrix
+  terms <- reactive({
+    # Change when the "update" button is pressed...
+    input$update
+    # ...but not for anything else
+    isolate({
+      withProgress({
+        setProgress(message = "Processing corpus...")
+        getTermMatrix(input$selection)
+      })
+    })
+  })
+  
+  # Make the wordcloud drawing predictable during a session
+  wordcloud_rep <- repeatable(wordcloud)
+  output$plot <- renderPlot({
+    wordcloud_rep(dm$word,dm$freq, scale=c(5,1),
+                  min.freq = input$freq, max.words=input$max,
+                  colors=brewer.pal(8, "Dark2"))
+  })
+}
+
+###ui
+ui<-fluidPage(
+  # Application title
+  titlePanel("Word Cloud"),
+  sidebarLayout(
+    # Sidebar with a slider and selection inputs
+    sidebarPanel(
+      selectInput("selection", "Choose a hashtag:",
+                  choices = books),
+      actionButton("update", "Change"),
+      hr(),
+      sliderInput("freq",
+                  "Minimum Frequency:",
+                  min = 1,  max = 100, value = 15),
+      sliderInput("max",
+                  "Maximum Number of Words:",
+                  min = 1,  max = 300,  value = 100)
+    ),
+    # Show Word Cloud
+    mainPanel(
+      plotOutput("plot")
+    )
+  )
+)
 shinyApp(ui, server)
