@@ -1,0 +1,93 @@
+---
+title: "Final Project Presentation"
+author: "Mengze Yin"
+date: "December 12, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## I. Introduction
+
+
+## II. Dataset Summary
+
+In this project, all our datasets come from Twitter. We planned to explore how the attitude of the public towards Donald Trump has changed through different time periods and across different locations the US at the beginning. We use the function filterstream() to search for tweets in 6 typical states, 2 each for red, blue and swing states during the 2016 president election with hashtag "@RealDonaldTrump OR #DonaldTrump". However, when we later reviewed those tweets we got, we found that only a few of them are actually related with the topic we chose.
+
+To avoid this situation, we use the searchTwitter() function instead to collect tweets under three topics, which are "@RealDonaldTrump OR #DonaldTrump", "#MakeAmericaGreatAgain", and "#NeverTrump". By using searchTwitter() function, we cannot get users' locations directly, so we use the function lookupUsers() provided by Twitter API to get each user's location then transfer into geocode by google map API. We try to rerun the search process to get a large dataset throughout the whole process to make our further exploration more actuate, however, due to the limitation on Twitter API to look up for users' locations (we each are forbidden from the token access after the first search) and the 2500 data per computer by google map API, we can only get 10,000 data. Moreover, since those data includes all tweets around the world, when we decrease the scope to the US, we are finalized with 4728 data in total with locations within the US. 
+ 
+To scale the attitude of the public for quantitative analysis, we write a function called sentiment_scores() to score the sentiment of each tweets based on words in the text. We compare those words with two dictionaries that include most positive and negative sentiment words to see how strong the sentiment is and whether it is a positive sentiment or a negative one. 
+
+```{r}
+positives = readLines("positive-words.txt")
+negatives = readLines("negative-words.txt")
+
+sentiment_scores = function(tweets, positive_words, negative_words, .progress='none'){
+  scores = laply(tweets,
+                 function(tweets, positive_words, negative_words){
+                   tweets = gsub("[[:punct:]]", "", tweets)    # remove punctuation
+                   tweets = gsub("[[:cntrl:]]", "", tweets)   # remove control characters
+                   tweets = gsub('\\+', '', tweets)          # remove digits
+                   
+                   # Let's have error handling function when trying tolower
+                   tryTolower = function(x){
+                     # create missing value
+                     y = NA
+                     # tryCatch error
+                     try_error = tryCatch(tolower(x), error=function(e) e)
+                     # if not an error
+                     if (!inherits(try_error, "error"))
+                       y = tolower(x)
+                     # result
+                     return(y)
+                   }
+                   # use tryTolower with sapply
+                   tweets = sapply(tweets, tryTolower)
+                   # split sentence into words with str_split function from stringr package
+                   word_list = str_split(tweets, "\\s+")
+                   words = unlist(word_list)
+                   
+                   # compare words to the dictionaries of positive & negative terms
+                   positive.matches = match(words, positive_words)
+                   negative.matches = match(words, negative_words)
+                   # get the position of the matched term or NA
+                   # we just want a TRUE/FALSE
+                   positive_matches <- !is.na(positive.matches)
+                   negative_matches <- !is.na(negative.matches)
+                   # final score
+                   score = sum(positive_matches) - sum(negative_matches)
+                   return(score)
+                 }, positive_words, negative_words, .progress=.progress)
+  return(scores)
+}
+
+```
+After scoring tweets under each topic, we draw histograms to see the distribution as a simple check whether the result matches our selection (the negative topic will have more negative sentiments). We also add a column of the absolute value of those sentiment scores for comparing only the strength of sentiment in the later analysis.
+
+After we finalizing our data frames by only showing useful and related information, we get 3 frames for each topic and a total one, including screenname, text, retweetCount, score, absolute_score, lon, and lat. For convenience, we save those frames throughout the process and we will just load those frames here to conduct further explorations.
+```{r}
+data3 <- read.csv("never.csv",row.names = 1)
+data2 <- read.csv("maga.csv", row.names = 1)
+data1 <- read.csv("trump.csv",row.names = 1)
+
+total <- rbind(data1, data2, data3)
+```
+
+## III. Statstical Analysis
+
+## IV. Mapping with Sentiment
+
+## V. Shinny App
+
+## VI. Future Improvements and Questions
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
