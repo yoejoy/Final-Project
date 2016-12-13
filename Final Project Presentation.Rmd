@@ -1,6 +1,6 @@
 ---
 title: "Final Project Presentation"
-author: "Mengze Yin"
+author: "Mengze Yin, Yilin Li, Yijie Yu, Tianxuan Zhang"
 date: "December 12, 2016"
 output: html_document
 ---
@@ -9,6 +9,11 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 ## I. Introduction
+
+Even after the controversy presidential results came out, the debate on social media has never ended. One of the most prominent effect of the communication happens on social media especially on Twitter. 
+
+In order to figure out what Internet users are talking about and how they feel during and post the election, we planned to collect historical data during the intervals of three presidential debates. If we could acquire the historical data during those different periods of time, we would be able to compare the information and people's attitude towards the presidency as time went on. However, the major issue we encountered is that Twitter API only allows us to access user data from very recent seven days for confidential reasons. As a result, we changed our focus to recent data to find out what users are talking about in a recent timeframe and analyzed the sentiments and popularity of tweets. 
+
 
 
 ## II. Dataset Summary
@@ -73,21 +78,315 @@ data1 <- read.csv("trump.csv",row.names = 1)
 
 total <- rbind(data1, data2, data3)
 ```
+To have a general understanding on what are the most popular words that people use in tweets to express their thoughts regard the election, we do wordclouds under each topic and the total dataframe.
+```{r}
+library(tm)
+library(wordcloud)
+# function to clean text for future preparation
+clean.text <- function(some_txt)
+{
+  some_txt = gsub("&amp", "", some_txt)
+  some_txt = gsub("(RT|via)((?:\b\\W*@\\w+)+)", "", some_txt)
+  some_txt = gsub("@\\w+", "", some_txt)
+  some_txt = gsub("[[:punct:]]", "", some_txt)
+  some_txt = gsub("[[:digit:]]", "", some_txt)
+  some_txt = gsub("http\\w+", "", some_txt)
+  some_txt = gsub("[ t]{2,}", "", some_txt)
+  some_txt = gsub("^\\s+|\\s+$", "", some_txt)
+  
+  # define "tolower error handling" function
+  try.tolower = function(x)
+  {
+    y = NA
+    try_error = tryCatch(tolower(x), error=function(e) e)
+    if (!inherits(try_error, "error"))
+      y = tolower(x)
+    return(y)
+  }
+  some_txt = sapply(some_txt, try.tolower)
+  some_txt = some_txt[some_txt != ""]
+  names(some_txt) = NULL
+  return(some_txt)
+}
+
+# get cleaned tweets
+tweets1 <- gettext(data1$text)
+tweets2 <- gettext(data2$text)
+tweets3 <- gettext(data3$text)
+tweets4 <- gettext(total$text)
+
+tweetwordcloud <- function(tweets){
+  clean_text = clean.text(tweets)
+  tweet_corpus = Corpus(VectorSource(clean_text))
+  tdm = TermDocumentMatrix(tweet_corpus, control = list(removePunctuation = TRUE,stopwords = c("donald", "trump", "real", "nevertrump",stopwords("english")), removeNumbers = TRUE, tolower = TRUE))
+  m = as.matrix(tdm) #we define tdm as matrix
+  word_freqs = sort(rowSums(m), decreasing=TRUE) #now we get the word orders in decreasing order
+  dm = data.frame(word=names(word_freqs), freq=word_freqs) #we create our data set
+  y <- wordcloud(dm$word, dm$freq,scale=c(5,0.1), max.words=200, min=2,random.order=FALSE, 
+                          rot.per=0.35, use.r.layout=FALSE, colors = brewer.pal(8, "Dark2")) #and we visualize our data
+  return(y)
+}
+wordclound1 <- tweetwordcloud(tweets1) # word cloud under topic "Donald Trump"
+wordclound2 <- tweetwordcloud(tweets2) # word cloud under topic "MAGA"
+wordclound3 <- tweetwordcloud(tweets3) # word cloud under topic "Never Trump"
+wordclound4 <- tweetwordcloud(tweets4) # word cloud under the total dataset
+```
+
+We also run a plot to see the top 20 words more clearly.
+```{r}
+library(dplyr)
+library(tidyr)
+library(tidytext)
+library(lubridate)
+library(broom)
+library(scales)
+library(reshape2)
+library(stringr)
+library(ggplot2)
+d3 = read.csv("NEVER.csv", row.names = 1)
+d2 = read.csv("MAGA.csv", row.names = 1)
+d4 = read.csv("total.csv", row.names = 1)
+
+# use unnest_tokens function to remove some "stopwords"
+reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+tweet_words <- d4 %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(tweets = text) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = reg) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+#find the most common words in tweets
+commonword <- tweet_words %>%
+  dplyr::count(word, sort = TRUE) %>%
+  head(20) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_bar(stat = "identity") +
+  ylab("Occurrences") +
+  coord_flip()
+
+bing <- get_sentiments("bing")
+bing_word_counts <- tweet_words %>%
+  inner_join(bing) %>%
+  dplyr::count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+bing_word_counts <- bing_word_counts[-1, ]
+
+#remove the top key word "trump"
+bing_word_counts %>%
+  filter(n > 20) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Contribution to sentiment")
+
+```
 
 ## III. Statstical Analysis
 
+Given such an interesting dataset of 4728 tweets, we have many curious questions for ourselves, for example:
+ 
+1)   Is the sentiment data normal?
+2)   After the election, do people start to have neutral attitude towards trump?
+3)   Do tweets with stronger attitude (both positive & negative) get retweeted    
+more? How does the plot look like?
+4)   For the two hashtag groups #NeverTrump and #MAGA, is the mean retweet number the same for the population?
+5)   For the two hashtag groups, is the mean sentiment score the same for the population?
+
+Before answering the aforementioned questions, we are going to start out by summarize the data:
+```{r}
+library(MASS)
+#add a column name "hashtag"
+d3$hashtag=rep("NEVERTRUMP", 1279)
+d2$hashtag=rep("MAGA", 1238)
+# combine the two datasets into one for comparison
+d5 <- rbind(d3, d2)
+
+score.response = na.omit(d4$score)
+retweet <- d4$retweetCount
+summary(score.response)
+summary(retweet)
+```
+
+Q&A 
+ 
+####1. Test of Normality
+
+Q: Is the Sentiment Data Normal?
+ Method:  Shapiro-Wilk normality test, confidence level= 95%; QQplot
+ Test statistics: If p<0.05, then the data is not normal.
+```{r}
+## Shapiro.test, confidence level= 95%. If p < 0.05, our data deviates from deviation.
+data_score= d4$score
+shapiro.test(data_score)
+## Plot using a qqplot
+qqnorm(data_score);qqline(data_score, col = 2)
+```
+
+A: This p-value tells us what the chances are that the sample comes from a normal distribution. In this case, because p<0.05, we can conclude that the data fails to be a normal distribution. To help us visualize it, we also used a QQplot. The fact that most of the data deviates from the straight line also confirms our conclusion.
+
+####2. Hypothesis of Testing (Two-Tail)
+For someone notorious as Trump, it is easy to believe that people still show some negative emotions towards him, even after the election. To confirm our assumption, we conducted a Hypothesis Test.
+ 
+Q: After the election, do people start to have neutral attitude towards trump?
+Ho: score = 0	The feelings are neutral.
+Ha: score = -1   People are still slightly repelled by Trump.
+Confidence Interval = 95%
+Test statistic:  If t is not in the range of critical values, reject.
+```{r}
+## Hypothesis Testing (Ho: People are repulsed by Trump even after election. score = -1  )
+alpha=0.05
+mu0 = -1                        # hypothesized value 
+t = (mean(score.response) - mu0)/(sd(score.response)/sqrt(4728)) 
+t                      # test statistic 
+#compute the critical values at .05 significance leveL                      
+t.half.alpha = qt(1 - alpha/2, df= 4728 - 1) 
+cv<- c(-t.half.alpha, t.half.alpha) 
+cv
+```
+
+A: The test statistic 70.72 doesn't lie between the critical values -1.960, and 1.960. Hence, at .05 significance level, we reject the null hypothesis and conclude that people still have negative emotions towards trump.
+
+####3. Anova Table -- Single Factor
+Q:  Do tweets with stronger attitude (both positive & negative) get retweeted more?
+Confidence level: 95%
+Test Statistic: If p < 0.05, conclude that there is a linear relationship.
+```{r}
+# Anova Table -- analyze the relationship between sentiment and retweet number
+total = read.csv("total.csv")
+aov.out = aov(total$retweetCount~total$score, data=total)
+```
+ 
+A: Because p = 2.86e-13<0.05, we are confident to say that retweet number is related to sentiments.
+ 
+Q: How does the plot look like?
+```{r}
+ggplot(data = total, aes(x = absolute_score, y = retweetCount)) +
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  scale_y_continuous(limits = c(0, 10000))
+```
+
+A: The slope of the line is rather small because many tweets don't get retweeted. However, there is still a linear relationship. The stronger the sentiment, the higher possibility it might be tweeted.  For now, there are limited number of high scores. The accuracy of plot would improve if we have a huge dataset.
+ 
+####4. Anova Table - Comparison between treatments (Multiple Factors)
+To conduct this analysis, we combined our dataset of #NEVERTRUMP and #MAKEAMERICAGREATAGAIN to see if there is any difference in the retweet number between #NeverTrump and #MAGA groups.
+ 
+Q: For the two hashtag groups, is the mean retweet number the same for the population?
+Confidence Interval: 95%
+Test Statistics: p<0.05, conclude that their means are different.
+```{r}
+# compare the retweet mean difference across the 10 score groups from -5 to 5
+results <- aov(retweetCount ~ factor(hashtag), data=d5) 
+summary(results)
+summary.lm(results)
+```
+
+A: Because p < 2e-16 <0.05, there are significant differences between #NeverTrump and #MAGA groups. Tweets with hashtag#MAGA  get retweeted more than #NEVERTRUMP.
+ 
+Q: For the two hashtag groups, is the mean emotion level the same for the population?
+Confidence Interval: 95%
+Test Statistics: p<0.05, conclude that their means are different.
+```{r}
+# compare the score mean difference between the two hashtag groups
+results <- aov(score ~ factor(hashtag), data=d5) 
+summary(results)
+summary.lm(results)
+```
+
+A: Because p < 2e-16 <0.05, there are significant differences between #NeverTrump and #MAGA groups. Tweets with hashtag#MAGA have stronger emotions than #NeverTrump.
+
 ## IV. Mapping with Sentiment
 
-## V. Shinny App
+####Purpose
+The main purpose of mapping is to compare and analyze the distribution of twitter users who posted tweets on our selected topics. We plan to assign different point size to different level of sentiment with a range from 0 to 7, so that both strong negative and positive opinions would be relatively more noticeable on the maps. A sentiment score of -5 shows a strong negative emotion; while a score of 7 shows an extreme positive emotion. To distinguish negative sentiments from positive ones, we plan to apply two different colors, red and blue, based on its sentiment scores.
+
+####Process
+Firstly, we create a world map using ggmap. The tweet points on the map are clustered on the areas of North America and Europe, suggesting that most twitters who posted tweets about Donald Trump are located in these regions.
+Then, to view the distribution of these tweets in United States only, we create a country-wide map. From the map it clearly shows that there are more users located on the east coast and the Great Lakes. 
+```{r}
+library(ggmap)
+# mapping with sentiment scores
+usa_center <- as.numeric(geocode("United States"))
+USAMap = ggmap(get_googlemap(center=usa_center, scale=2, zoom=4), extent="device")
+# mapping with all data
+MAP4 <- USAMap +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((total$score>=0)),"brown1", "blue"), data=total, alpha=0.4, size=total$absolute_score) +
+  scale_size_continuous(range=total$score)+
+  ggtitle("U.S Mapping under the Total Dataset")
+MAP4
+```
+
+Since it is hard to distinguish the distribution of positive and negative opinions, we then create three more maps based on different tweet topics: "@RealDonaldTrump OR #DonaldTrump", "#MakeAmericaGreatAgain", and "#NeverTrump". 
+```{r}
+# mapping under topic "trump"
+MAP <- USAMap +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((data1$score>=0)),"brown1", "blue"), data=data1, alpha=0.4, size=data1$absolute_score) +
+  scale_size_continuous(range=data1$score)+
+  ggtitle("U.S Mapping under #DonaldTrump")
+MAP
+
+# mapping under topic "make america great again"
+MAP2 <- USAMap +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((data2$score>=0)),"brown1", "blue"), data=data2, alpha=0.4, size=data2$absolute_score) +
+  scale_size_continuous(range=data2$score)+
+  ggtitle("U.S Mapping under #MakeAmericaGreatAgain")
+MAP2
+
+# mapping under topic "never trump"
+MAP3 <- USAMap +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((data3$score>=0)),"brown1", "blue"), data=data3, alpha=0.4, size=data3$absolute_score) +
+  scale_size_continuous(range=data3$score)+
+  ggtitle("U.S Mapping under #NeverTrump")
+MAP3
+```
+
+In our conjecture, #DonaldTrump is a neutral topic. Its map verified our opinion by showing a comparatively more mixed-sentimental distribution.
+
+Besides, there are a lot more positive tweets (red spots) on the map of #MakeAmericaGreatAgain than on the other two topic maps, which totally makes sense since this topic has a more positive attitude. Also on this map, lots of red points lie on the east coast of America, representing that the public on the east coast are more inclined to this topic than people in other regions.   
+On the contrast, the map of #NeverTrump shows more blue points than the other two topic maps, which are distributed evenly on the map.
+
+After making three topic maps, we decide to further explore the tweets distribution and their sentiment levels for different states. Here we choose three representative states: Florida, California, and Michigan.
+```{r}
+# sentiment across different states
+florida_center <- as.numeric(geocode("Florida"))
+FLMap = get_googlemap("Florida", zoom=6, maptype = "roadmap", crop = FALSE)
+FL <- ggmap(FLMap) +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((total$score>=0)),"brown1", "blue"), data=total, alpha=0.4, size=total$absolute_score) +
+  scale_size_continuous(range=total$score)
+FL
+
+CA_center <- as.numeric(geocode("California"))
+CAMap <- get_googlemap("California", zoom = 6, maptype = "roadmap", crop = FALSE)
+CA <- ggmap(CAMap) +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((total$score>=0)),"brown1", "blue"), data=total, alpha=0.4, size=total$absolute_score) +
+  scale_size_continuous(range=total$score)
+CA
+
+MI_center <- as.numeric(geocode("Michigan"))
+MIMap <- get_googlemap("Michigan", zoom = 6, maptype = "roadmap", crop = FALSE)
+MI <- ggmap(MIMap) +
+  geom_point(aes(x=lon, y=lat), col=ifelse(((total$score>=0)),"brown1", "blue"), data=total, alpha=0.4, size=total$absolute_score) +
+  scale_size_continuous(range=total$score)
+MI
+```
+
+## V. Interactive Shiny Map
+
+As for the Shiny application, we created an interactive map that easier to use compared to static map in ggplot. For this shiny app, we found it would be more inspiring to focus on the popularity of the content. As a result, we used the raw data from number of retweets counts of each tweets we generated that with greater number of retweets, we considered that individual tweet more popular. In the map, the deeper the color of the popup points, the more popular the tweet content is.
+
+By utilizing the Shiny features that users can easily interact with the size and content of the map, we plotted the map on the overall United States on the beginning. Once users could get access to the map, the shiny feature enable the users to explore the data based on their preference. Choices are open while users can zoom the scale of the map and click on every individual points to find out more detail about that tweet. 
+Upgraded from ggmap experience, Shiny offers a great opportunities for better data visualization and interaction.
+
+Moreover, we created the shiny app to create a interactive word cloud app. In this app, moving from static word cloud, we integrated and enabled the choices in the frequency  of words appearance. Moreover, we created three different panel choices for users to select three different hashtags thus to be presented with different word cloud images.
+
+During the creative process, we confronted problems with error in reactive functions and as publishing the app to share. Even though our code are still immature in some of the part concerning this shiny app especially with the word cloud, we hope that we could solve most of our problems in the future exploration with Shiny. 
+
+https://yoejoy.shinyapps.io/shinyshiny/
 
 ## VI. Future Improvements and Questions
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

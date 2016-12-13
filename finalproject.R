@@ -169,7 +169,7 @@ s41 <- rbind(s4,s43)
 write.csv(s41,"TRUMP.csv")
 data1 <- read.csv("TRUMP.csv", row.names = 1)
 
-# Dataset Summary
+# Dataset Collection Summary
 data3 <- read.csv("never.csv",row.names = 1)
 data2 <- read.csv("maga.csv", row.names = 1)
 data1 <- read.csv("trump.csv",row.names = 1)
@@ -244,9 +244,9 @@ d5 <- rbind(d3, d2)
 
 score.response = na.omit(d4$score)
 
-xbar = mean(score.response)            # sample mean 
-s = sd(score.response)                 # sample standard deviation 
-n = length(score.response)    # sample size 
+summary(score.response)
+retweet <- total$retweetCount                # sample standard deviation 
+summary(retweet)
 ## Shapiro.test, confidence level= 95%. If p < 0.05, our data deviates from deviation.
 
 data_score= d4$score
@@ -259,7 +259,7 @@ qqnorm(data_score);qqline(data_score, col = 2)
 
 alpha=0.05
 mu0 = -1                        # hypothesized value 
-t = (xbar - mu0)/(s/sqrt(n)) 
+t = (mean(score.response) - mu0)/(s/sqrt(n)) 
 t                      # test statistic 
 #compute the critical values at .05 significance leveL                      
 t.half.alpha = qt(1 - alpha/2, df= n - 1) 
@@ -279,14 +279,6 @@ ggplot(data = total, aes(x = score, y = retweetCount)) +
 theme_bw()
 
 # Anova Table -- check if there is any difference in the retweet number between #NeverTrump and #MAGA groups
-#https://www.r-bloggers.com/analysis-of-variance-anova-for-multiple-comparisons/
-# test for variance, if variances are the same, we can then use anova to compare the means
-# score - factor(hashtag)
-nevertrump = d3$score
-maga = d2$score
-dati = c(nevertrump,maga)
-var.test(nevertrump,maga)  
-
 # compare the retweet mean difference across the 10 score groups from -5 to 5
 results <- aov(retweetCount ~ factor(score), data=d5) 
 summary(results)
@@ -371,7 +363,7 @@ MAP3
 MAP4 <- USAMap +
   geom_point(aes(x=lon, y=lat), col=ifelse(((total$score>=0)),"brown1", "blue"), data=total, alpha=0.4, size=total$absolute_score) +
   scale_size_continuous(range=total$score)+
-  ggtitle("U.S Mapping under #MakeAmericaGreatAgain")
+  ggtitle("U.S Mapping under the Total Dataset")
 MAP4
 
 # sentiment across different states
@@ -407,12 +399,9 @@ write.table(maga$text, "maga.txt", fileEncoding='utf8')
 write.table(never$text, "never.txt",fileEncoding='utf8' )
 write.table(trump$text, "trump.txt",fileEncoding='utf8' )
 
-
-
 books <- list("#MakeAmericanGreatAgain" = "maga" ,
               "#NeverTrump" =  "never",
               "#DonaldTrump" = "trump")
-
 
 # Using "memoise" to automatically cache the results
 
@@ -501,7 +490,6 @@ ui<-fluidPage(
   )
 )
 shinyApp(ui, server)
-
 
 
 # retweetCount
